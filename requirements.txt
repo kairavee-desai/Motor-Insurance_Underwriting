@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+pydantic
+duckdb
+pandas
+numpy
+openpyxl
+faker
+pytest
+httpx
+python-dotenv
