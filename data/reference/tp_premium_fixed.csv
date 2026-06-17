@@ -1,0 +1,13 @@
+fuel_class,bucket,term,premium_inr
+ICE,<1000,1yr,2094
+ICE,<1000,3yr_single,6521
+ICE,1000-1500,1yr,3416
+ICE,1000-1500,3yr_single,10640
+ICE,>1500,1yr,7897
+ICE,>1500,3yr_single,24596
+EV,<30KW,1yr,1940.0
+EV,<30KW,3yr_single,5543
+EV,30-65KW,1yr,3165.0
+EV,30-65KW,3yr_single,9044
+EV,>65KW,1yr,7317.0
+EV,>65KW,3yr_single,20907
