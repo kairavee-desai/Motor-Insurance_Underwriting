@@ -1,0 +1,47 @@
+sno,product_name,product_code,product_category,od_tp_term
+1,Private Car Package Policy,3001,PVT,1+1
+2,Private Car Liability Policy,3001/A,PVT,0+1
+3,3 Years - Private Car Liability Policy,3001/A3,PVT,0+3
+4,3 Years - Private Car Package Policy,3001/P3,PVT,3+3
+5,Bundled - Private Car Policy,3001/1B3,PVT,1+3
+6,Stand-Alone Own Damage Private Car insurance Policy,3001/O,PVT,1+0
+7,2 Years- Stand-Alone Own Damage Private Car Insurance Policy,3001/O2,PVT,2+0
+8,Private Car Liability With Fire Only,3001/F,PVT,
+9,Private Car Liability With Fire And Theft Only,3001/L,PVT,
+10,Private Car Liability With Theft Only,3001/T,PVT,
+11,Two Wheeler Vehicle Package Policy,3005,TW,1+1
+12,Two Wheeler Vehicle Liability Policy,3005/A,TW,0+1
+5,Bundled - Two Wheeler Policy,3005/1B5,TW,1+5
+13,5 Years - Two Wheeler Liability Policy,3005/A5,TW,0+5
+14,5 Years - Two Wheeler Package Policy,3005/P5,TW,5+5
+15,2 Years - Two Wheeler Package Policy,3005/P2,TW,2+2
+16,3 Years - Two Wheeler Package Policy,3005/P3,TW,3+3
+17,Stand-Alone Own Damage Two wheeler Insurance Policy,3005/O,TW,1+0
+18,2 Years- Stand-Alone Own Damage Two Wheeler Insurance Policy,3005/O2,TW,2+0
+19,3 Years- Stand-Alone Own Damage Two Wheeler Insurance Policy,3005/O3,TW,3+0
+20,4 Years- Stand-Alone Own Damage Two Wheeler Insurance Policy,3005/O4,TW,4+0
+21,Two Wheeler Liability With Fire Only,3005/F,TW,
+22,Two Wheeler Liability With Fire And Theft Only,3005/L,TW,
+23,Two Wheeler Liability With Theft Only,3005/T,TW,
+24,Goods Carrying  Vehicle Package Policy,3003,GCV,1+1
+25,Goods Carrying Vehicle Liability Policy,3003/A,GCV,0+1
+26,Goods Carrying Liability With Fire Only,3003/F,GCV,
+27,Goods Carrying Liability With Fire And Theft Only,3003/L,GCV,
+28,Goods Carrying Liability With Theft Only,3003/T,GCV,
+29,Passenger Carrying Vehicle Package Policy,3004,PCV,1+1
+30,Passenger Carrying Vehicle Liability Policy,3004/A,PCV,0+1
+31,Passenger Carrying Liability With Fire Only,3004/F,PCV,
+32,Passenger Carrying Liability With Fire And Theft Only,3004/L,PCV,
+33,Passenger Carrying Liability With Theft Only,3004/T,PCV,
+34,Miscellaneous Vehicle Package Policy,3008,MISC D,1+1
+35,Miscellaneous Vehicle Liability Policy,3008/A,MISC D,0+1
+36,Motor Trade Road Risk Liability Policy,3006/A,"E, F, G",0+1
+37,Motor Trade Road Risk Package Policy,3006/B,"E, F, G",1+1
+38,Motor Trade Internal Risk Liability Policy,3007/A,"E, F, G",0+1
+39,Motor Trade Internal Risk Package Policy,3007/B,"E, F, G",1+1
+40,Trailer Liability Policy,3009/A,"E, F, G",0+1
+41,Trailer Package Policy,3009/B,"E, F, G",1+1
+42,Motor Trade Road Transit Risk Liability Policy,3010/A,"E, F, G",0+1
+43,Motor Trade Road Transit Risk Package Policy,3010/B,"E, F, G",1+1
+44,Smart Drive Motor Warranty Insurance,4112,EW,
+45,Compulsory Personal Accident (Owner-Driver) under Motor Insurance Policies,3012,SCPA,
