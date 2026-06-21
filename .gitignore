@@ -11,3 +11,7 @@ dist/
 build/
 .pytest_cache/
 *.egg-info/
+
+# Phase 3 generator output (reproducible from generate_synthetic.py --seed)
+data/synthetic_policies.csv
+data/synthetic_policies.parquet

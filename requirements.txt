@@ -9,3 +9,4 @@ faker
 pytest
 httpx
 python-dotenv
+pyarrow
