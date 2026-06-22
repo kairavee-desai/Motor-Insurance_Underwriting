@@ -1,25 +1,19 @@
 """
 backend/db/seeds/generate_synthetic.py
 
-Phase 3: row-by-row synthetic policy generator.
+Phase 3/4: Row-by-row synthetic policy generator with schema widening.
 
 Follows the exact sequence described for the manual process: exshowroom/IDV ->
-tariff rate (zone x cc-bucket x age) -> Tariff_OD -> Earned Discount (sampled
-around real category benchmarks) -> Basic OD -> NCB -> Total OD Premium ->
-Zero Dep add-on -> fixed TP premium (term-based) -> earned/written exposure
-(policy start date vs today) -> commission (IRDA 19.5% + age-scaled agent
-commission) -> BSE -> CoA -> loss costs (sampled around real ODLR/TPLR
-benchmarks) -> SLR -> OR.
+tariff rate -> Tariff_OD -> Earned Discount -> Basic OD -> NCB -> Total OD Premium ->
+Zero Dep add-on -> fixed TP premium -> earned/written exposure -> commission ->
+BSE -> CoA -> loss costs -> SLR -> OR.
 
-Every categorical dimension is sampled with real weights pulled from the
-Business Contribution benchmarks where available; where the source data
-didn't give us a weighting (RTO cluster, CC bucket, vehicle age distribution,
-ex-showroom price, tariff zone assignment, manufacturer->segment-tier
-mapping), a documented assumption is used instead -- see ASSUMPTIONS below.
-These are the first places to swap in real data later.
+Schema Widening (Phase 4.5): Added Commission Breakdown and Add-on flags based
+on the raw data sample, while keeping the scope PC-only. Central_Reward is locked
+to 1.570% of Reward_GWP based on observed ground truth.
 
 Usage:
-    python backend/db/seeds/generate_synthetic.py --rows 20000 --seed 42
+python backend/db/seeds/generate_synthetic.py --rows 20000 --seed 42
 """
 
 import argparse
@@ -38,23 +32,15 @@ REF_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "ref
 TODAY = date(2026, 6, 21)
 GRAND_TOTAL_DISCOUNT = 0.71197
 
-
 # ===========================================================================
 # ASSUMPTIONS (documented, revisit when real data is available):
-#   - RTO cluster: sampled uniformly across the 117 clusters (no real
-#     cluster-level volume weights were in the source data).
-#   - CC bucket mix and ex-showroom price bands: approximate India PV market
-#     splits, not sourced from the workbook.
-#   - Vehicle age distribution: approximated as a renewal-heavy book (skews
-#     toward younger ages) consistent with Retention+Rollover being ~54% of
-#     business per the Transaction Type benchmark.
-#   - Tariff zone (A/B/C) and Zone/RTO_Zone derivation from RTO cluster/state:
-#     approximate city-tier mapping, since only 4 explicit Zone-A cities were
-#     given (Chennai/Delhi/Kolkata/Mumbai) and Zone C was cropped from the photo.
-#   - Manufacturer -> Segment tier mapping: rule-based (brand name match),
-#     since the source data didn't give a manufacturer-to-tier crosswalk.
+#   - RTO cluster: sampled uniformly across the 117 clusters.
+#   - CC bucket mix and ex-showroom price bands: approximate India PV market splits.
+#   - Vehicle age distribution: approximated as a renewal-heavy book.
+#   - Tariff zone (A/B/C) and Zone/RTO_Zone derivation from RTO cluster/state.
+#   - Manufacturer -> Segment tier mapping: rule-based (brand name match).
+#   - Commission Add-ons: Kept at 0.0 base matching the raw sample sparsity.
 # ===========================================================================
-
 
 def load_reference():
     ref = {}
@@ -96,30 +82,30 @@ def load_reference():
 
 
 # ---------------------------------------------------------------------------
-# Geography derivation (approximate -- see ASSUMPTIONS)
+# Geography derivation (approximate)
 # ---------------------------------------------------------------------------
 
 STATE_TO_ZONE = {
     **{s: "NORTH" for s in ["DELHI", "HARYANA", "PUNJAB", "HIMACHALPRADESH", "JAMMUANDKASHMIR",
-                             "UTTARAKHAND", "CHANDIGARH", "UTTARPRADESH", "RAJASTHAN"]},
+                            "UTTARAKHAND", "CHANDIGARH", "UTTARPRADESH", "RAJASTHAN"]},
     **{s: "SOUTH" for s in ["KARNATAKA", "KERALA", "TAMILNADU", "TELANGANA", "ANDHRAPRADESH",
-                             "LAKSHADWEEP", "ANDAMAN&NICOBAR"]},
+                            "LAKSHADWEEP", "ANDAMAN&NICOBAR"]},
     **{s: "EAST" for s in ["WESTBENGAL", "ODISHA", "BIHAR", "JHARKHAND", "SIKKIM",
-                            "ARUNACHALPRADESH", "ASSAM", "MANIPUR", "MEGHALAYA", "MIZORAM",
-                            "NAGALAND", "TRIPURA"]},
+                           "ARUNACHALPRADESH", "ASSAM", "MANIPUR", "MEGHALAYA", "MIZORAM",
+                           "NAGALAND", "TRIPURA"]},
     **{s: "WEST" for s in ["MAHARASHTRA", "GUJARAT", "GOA", "MADHYAPRADESH", "CHHATTISGARH"]},
 }
 
 STATE_TO_RTO_ZONE = {
     "DELHI": "NCR",
     **{s: "RON" for s in ["HARYANA", "PUNJAB", "HIMACHALPRADESH", "JAMMUANDKASHMIR",
-                           "UTTARAKHAND", "CHANDIGARH", "UTTARPRADESH", "RAJASTHAN",
-                           "MADHYAPRADESH", "CHHATTISGARH"]},
+                          "UTTARAKHAND", "CHANDIGARH", "UTTARPRADESH", "RAJASTHAN",
+                          "MADHYAPRADESH", "CHHATTISGARH"]},
     **{s: "SOUTH" for s in ["KARNATAKA", "KERALA", "TAMILNADU", "TELANGANA", "ANDHRAPRADESH",
-                             "LAKSHADWEEP", "ANDAMAN&NICOBAR"]},
+                            "LAKSHADWEEP", "ANDAMAN&NICOBAR"]},
     **{s: "EAST" for s in ["WESTBENGAL", "ODISHA", "BIHAR", "JHARKHAND", "SIKKIM",
-                            "ARUNACHALPRADESH", "ASSAM", "MANIPUR", "MEGHALAYA", "MIZORAM",
-                            "NAGALAND", "TRIPURA"]},
+                           "ARUNACHALPRADESH", "ASSAM", "MANIPUR", "MEGHALAYA", "MIZORAM",
+                           "NAGALAND", "TRIPURA"]},
     **{s: "WEST" for s in ["MAHARASHTRA", "GUJARAT", "GOA"]},
 }
 
@@ -134,7 +120,6 @@ TARIFF_ZONE_B_CLUSTERS = {"BANGALORE", "BANGALORE SURROUNDING", "HYDERABAD", "HY
                           "RANCHI", "RANCHI SURROUNDING", "SHIMLA", "GANGTOK", "SHILLONG", "KOHIMA",
                           "ITANAGAR", "IMPHAL", "AIZAWL", "PANAJI", "DEHRADUN", "SRINAGAR", "JAMMU"}
 
-
 def tariff_zone_for_cluster(cluster: str) -> str:
     if cluster in TARIFF_ZONE_A_CLUSTERS:
         return "A"
@@ -142,9 +127,8 @@ def tariff_zone_for_cluster(cluster: str) -> str:
         return "B"
     return "C"
 
-
 # ---------------------------------------------------------------------------
-# Manufacturer -> segment tier + ex-showroom price band (assumption, see header)
+# Manufacturer -> segment tier + ex-showroom price band
 # ---------------------------------------------------------------------------
 
 ULTRA_LUXURY = {"FERRARI", "LAMBORGHINI", "LAMBORGINI", "ROLLS ROYCE", "ROLLS-ROYCE", "BENTLEY",
@@ -157,27 +141,17 @@ PRICE_BANDS_LAKH = {
     "OTHERS": (5, 18),
 }
 
-
 def segment_tier_for_manufacturer(mfr: str) -> str:
     u = mfr.upper()
-    if "HONDA" in u:
-        return "HONDA"
-    if "HYUNDAI" in u:
-        return "HYUNDAI"
-    if "MARUTI" in u:
-        return "MARUTI"
-    if "TATA" in u:
-        return "TATA"
-    if "TOYOTA" in u:
-        return "TOYOTA"
-    if "MAHINDRA" in u or u in {"M&M", "M & M"}:
-        return "M&M"
-    if u in ULTRA_LUXURY:
-        return "PREMIUM2"
-    if u in ENTRY_LUXURY:
-        return "PREMIUM1"
+    if "HONDA" in u: return "HONDA"
+    if "HYUNDAI" in u: return "HYUNDAI"
+    if "MARUTI" in u: return "MARUTI"
+    if "TATA" in u: return "TATA"
+    if "TOYOTA" in u: return "TOYOTA"
+    if "MAHINDRA" in u or u in {"M&M", "M & M"}: return "M&M"
+    if u in ULTRA_LUXURY: return "PREMIUM2"
+    if u in ENTRY_LUXURY: return "PREMIUM1"
     return "OTHERS"
-
 
 def sample_exshowroom_price(rng, segment_tier: str) -> float:
     lo, hi = PRICE_BANDS_LAKH.get(segment_tier, PRICE_BANDS_LAKH["OTHERS"])
@@ -186,27 +160,19 @@ def sample_exshowroom_price(rng, segment_tier: str) -> float:
     price = rng.lognormal(mean=np.log(mid), sigma=sigma)
     return float(np.clip(price, lo, hi)) * 100_000
 
-
 # ---------------------------------------------------------------------------
 # IRDA-standard IDV depreciation schedule
 # ---------------------------------------------------------------------------
 
 def idv_depreciation_factor(vehicle_age_years: int) -> float:
     age = vehicle_age_years
-    if age == 0:
-        return 0.95   # <=6 months
-    if age <= 1:
-        return 0.85
-    if age <= 2:
-        return 0.80
-    if age <= 3:
-        return 0.70
-    if age <= 4:
-        return 0.60
-    if age <= 5:
-        return 0.50
-    return 0.40  # >5 years: typically negotiated; held flat for the demo
-
+    if age == 0: return 0.95
+    if age <= 1: return 0.85
+    if age <= 2: return 0.80
+    if age <= 3: return 0.70
+    if age <= 4: return 0.60
+    if age <= 5: return 0.50
+    return 0.40
 
 # ---------------------------------------------------------------------------
 # Weighted sampling helpers
@@ -222,13 +188,11 @@ def weighted_choice(rng, df, weight_col="business_pct"):
     weights = weights / weights.sum()
     return rng.choice(cats, p=weights)
 
-
 def lookup_discount(ref, dimension, key, default=GRAND_TOTAL_DISCOUNT):
     v = ref["discount"].get(dimension, {}).get(str(key))
     if v is None or (isinstance(v, float) and np.isnan(v)):
         return default
     return float(v)
-
 
 def lookup_loss_ratio(ref, dimension, key, col):
     biz = ref["business"].get(dimension)
@@ -237,11 +201,9 @@ def lookup_loss_ratio(ref, dimension, key, col):
     v = biz.loc[key, col]
     return None if pd.isna(v) else float(v)
 
-
 CC_BUCKET_WEIGHTS = {"<1000": 0.22, "1000-1500": 0.55, ">1500": 0.23}
 VEHICLE_AGE_WEIGHTS = {0: 0.18, 1: 0.14, 2: 0.12, 3: 0.11, 4: 0.10, 5: 0.09,
                        6: 0.08, 7: 0.07, 8: 0.05, 9: 0.03, 10: 0.03}
-
 
 def sample_cc_bucket(rng, segment_tier):
     if segment_tier in ("PREMIUM1", "PREMIUM2"):
@@ -250,17 +212,14 @@ def sample_cc_bucket(rng, segment_tier):
     weights = np.array(list(CC_BUCKET_WEIGHTS.values()))
     return rng.choice(cats, p=weights / weights.sum())
 
-
 def sample_vehicle_age(rng):
     cats = list(VEHICLE_AGE_WEIGHTS.keys())
     weights = np.array(list(VEHICLE_AGE_WEIGHTS.values()))
     return int(rng.choice(cats, p=weights / weights.sum()))
 
-
 def random_date_in_range(rng, start: date, end: date) -> date:
     delta_days = (end - start).days
     return start + timedelta(days=int(rng.integers(0, delta_days + 1)))
-
 
 # ---------------------------------------------------------------------------
 # Per-row generation
@@ -272,7 +231,7 @@ def generate_row(rng, ref, row_id):
     vertical = weighted_choice(rng, ref["business"]["vertical"])
     emg_pmg = weighted_choice(rng, ref["business"]["emg_pmg"])
     transaction_type = weighted_choice(rng, ref["business"]["transaction_type"])
-    fuel_type = rng.choice(ref["business"]["fuel_type"].index[:-1])  # exclude Grand Total; no weight col
+    fuel_type = rng.choice(ref["business"]["fuel_type"].index[:-1])
     ncb_flag = weighted_choice(rng, ref["business"]["ncb_flag"])
 
     if ncb_flag == "Y":
@@ -307,7 +266,7 @@ def generate_row(rng, ref, row_id):
     )
     tariff_od = f.actual_amt(idv, tariff_pct)
 
-    # --- Earned discount: blend of real category benchmarks + noise ---
+    # --- Earned discount ---
     discount_components = [
         lookup_discount(ref, "manufacturer", manufacturer),
         lookup_discount(ref, "segment_tier", segment_tier),
@@ -337,7 +296,6 @@ def generate_row(rng, ref, row_id):
     fuel_class = "EV" if fuel_type == "Electric" else "ICE"
     term_key = "1yr" if term_years == 1 else "3yr_single"
     if fuel_class == "EV":
-        # No direct cc->kW mapping exists; approximate using the same tercile split.
         tp_bucket = {"<1000": "<30KW", "1000-1500": "30-65KW", ">1500": ">65KW"}[cc_bucket]
     else:
         tp_bucket = cc_bucket
@@ -360,32 +318,29 @@ def generate_row(rng, ref, row_id):
     irda_like = total_commission_rate * f._safe_div(total_od_premium, total_od_premium + tp_premium_amt)
     coa = irda_like + bse_pct
 
-    # --- Loss costs, anchored on real OR/CoA benchmarks ---
-    # ODLR%/TPLR% in the source are computed against a different premium base
-    # than our per-row OD/TP split, so using them directly understates loss
-    # cost. Instead: derive the target combined SLR from OR_val - CoA per
-    # category (both real benchmark columns), then split it into OD/TP using
-    # the *relative shape* of ODLR%/TPLR% (which dimension carries more loss)
-    # while forcing the overall level to match the real OR.
+    # --- Loss costs (Weighted Deviation Model) ---
+    GRAND_OR, GRAND_COA = 0.9757515241, 0.2489592571
+    DIM_WEIGHTS = {"manufacturer": 0.40, "rto_state": 0.20, "vertical": 0.15,
+                   "transaction_type": 0.15, "ncb_flag": 0.10}
     bench_dims = [
         ("manufacturer", manufacturer), ("rto_state", rto_state), ("vertical", vertical),
         ("transaction_type", transaction_type), ("ncb_flag", ncb_flag),
     ]
-    or_components, coa_components, odlr_components, tplr_components = [], [], [], []
+
+    or_dev, coa_dev, odlr_components, tplr_components = 0.0, 0.0, [], []
     for dim, key in bench_dims:
-        or_components.append(lookup_loss_ratio(ref, dim, key, "or_val"))
-        coa_components.append(lookup_loss_ratio(ref, dim, key, "coa"))
+        w = DIM_WEIGHTS[dim]
+        v_or = lookup_loss_ratio(ref, dim, key, "or_val")
+        v_coa = lookup_loss_ratio(ref, dim, key, "coa")
+        if v_or is not None:
+            or_dev += w * (v_or - GRAND_OR)
+        if v_coa is not None:
+            coa_dev += w * (v_coa - GRAND_COA)
         odlr_components.append(lookup_loss_ratio(ref, dim, key, "odlr_pct"))
         tplr_components.append(lookup_loss_ratio(ref, dim, key, "tplr_pct"))
-    fuel_or = lookup_loss_ratio(ref, "fuel_type", fuel_type, "or_val")
-    fuel_coa = lookup_loss_ratio(ref, "fuel_type", fuel_type, "coa")
-    if fuel_or is not None:
-        or_components.append(fuel_or)
-    if fuel_coa is not None:
-        coa_components.append(fuel_coa)
 
-    bench_or = float(np.nanmean([v for v in or_components if v is not None])) if any(v is not None for v in or_components) else 0.976
-    bench_coa = float(np.nanmean([v for v in coa_components if v is not None])) if any(v is not None for v in coa_components) else 0.249
+    bench_or = GRAND_OR + or_dev
+    bench_coa = GRAND_COA + coa_dev
     target_slr = float(np.clip(bench_or - bench_coa, 0.25, 1.4))
 
     mean_odlr = float(np.nanmean([v for v in odlr_components if v is not None])) if any(v is not None for v in odlr_components) else 0.25
@@ -395,8 +350,8 @@ def generate_row(rng, ref, row_id):
     od_lr = mean_odlr * scale
     tp_lr = mean_tplr * scale
 
-    od_lr = float(np.clip(od_lr * (1 + rng.normal(0, 0.15)), 0.05, 2.0))
-    tp_lr = float(np.clip(tp_lr * (1 + rng.normal(0, 0.15)), 0.05, 2.0))
+    od_lr = float(np.clip(od_lr * (1 + rng.normal(0, 0.06)), 0.05, 2.0))
+    tp_lr = float(np.clip(tp_lr * (1 + rng.normal(0, 0.06)), 0.05, 2.0))
 
     od_loss_cost = total_od_premium * od_lr
     tp_loss_cost = tp_premium_amt * tp_lr
@@ -405,6 +360,11 @@ def generate_row(rng, ref, row_id):
     tp_slr = f.tp_slr(tp_loss_cost, tp_premium_amt)
     slr = f.slr(od_loss_cost, tp_loss_cost, total_od_premium, tp_premium_amt)
     operating_ratio = f.operating_ratio(slr, coa)
+    
+    # --- Schema Widening: Commissions & Add-ons ---
+    reward_gwp = written_od_premium + written_tp_premium
+    central_reward = reward_gwp * 0.01570
+    actual_commission = reward_gwp * total_commission_rate
 
     return {
         "policy_id": row_id,
@@ -427,14 +387,25 @@ def generate_row(rng, ref, row_id):
         "prev_year_ncb_flag": ncb_flag,
         "ncb_pct": round(ncb_pct, 4),
         "ncb_amt": round(ncb_amt, 2),
-        "zero_dep_flag": zero_dep_flag,
         "exshowroom_price": round(exshowroom, 2),
         "idv": round(idv, 2),
         "tariff_pct": round(tariff_pct, 4),
         "tariff_od": round(tariff_od, 2),
         "earned_discount": round(earned_discount, 4),
         "basic_od_premium": round(basic_od_premium, 2),
+        
+        # Add-on Flags & Premiums
+        "zero_dep_flag": zero_dep_flag,
         "zero_dep_premium": round(zero_dep_premium, 2),
+        "rsa_flag": False, "rsa_prem": 0.0,
+        "key_protect_flag": False, "key_protect_prem": 0.0,
+        "tyre_protect_flag": False, "tyre_protect_prem": 0.0,
+        "consumables_flag": False, "consumables_prem": 0.0,
+        "engine_protect_plus_flag": False, "engine_protect_plus_prem": 0.0,
+        "loss_of_personal_belongings_flag": False, "loss_of_personal_belongings_prem": 0.0,
+        "rti_flag": False, "rti_prem": 0.0,
+        "garage_cash_flag": False, "garage_cash_prem": 0.0,
+        
         "total_od_premium": round(total_od_premium, 2),
         "tp_premium_amt": round(tp_premium_amt, 2),
         "written_od_premium": round(written_od_premium, 2),
@@ -442,6 +413,15 @@ def generate_row(rng, ref, row_id):
         "earned_od_premium": round(earned_od_premium, 2),
         "earned_tp_premium": round(earned_tp_premium, 2),
         "earned_fraction": round(earned_fraction, 4),
+        
+        # Commission Breakdown
+        "reward_gwp": round(reward_gwp, 2),
+        "central_reward": round(central_reward, 2),
+        "actual_commission": round(actual_commission, 2),
+        "final_reward": 0.0,
+        "bsc_adv": 0.0,
+        "commission_adv": 0.0,
+
         "agent_commission_pct": round(agent_addon, 4),
         "total_commission_rate": round(total_commission_rate, 4),
         "bse_pct": round(bse_pct, 4),
@@ -454,13 +434,11 @@ def generate_row(rng, ref, row_id):
         "operating_ratio": round(operating_ratio, 4),
     }
 
-
 def generate(n_rows, seed=42):
     rng = np.random.default_rng(seed)
     ref = load_reference()
     rows = [generate_row(rng, ref, i + 1) for i in range(n_rows)]
     return pd.DataFrame(rows)
-
 
 def print_calibration_summary(df, ref):
     print(f"\n=== Calibration summary ({len(df)} rows) ===")
@@ -474,7 +452,6 @@ def print_calibration_summary(df, ref):
         bench = ref["business"]["manufacturer"].loc[m] if m in ref["business"]["manufacturer"].index else None
         bench_or = bench["or_val"] if bench is not None else float("nan")
         print(f"  {m:20s} n={len(sub):5d}  gen_OR={sub['operating_ratio'].mean():.4f}  bench_OR={bench_or:.4f}")
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
